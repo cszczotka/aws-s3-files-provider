@@ -11,6 +11,8 @@ using Syncfusion.EJ2.FileManager.Base;
 using Amazon;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using System.ComponentModel.DataAnnotations;
 
 namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
 {
@@ -24,11 +26,14 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         protected RegionEndpoint bucketRegion;
         private readonly IConfiguration config;
 
-        public AmazonS3ProviderController(IHostingEnvironment hostingEnvironment, IConfiguration  config)
+        public AmazonS3ProviderController(IHostEnvironment env, IConfiguration config)
         {
             this.config = config;
-            this.basePath = hostingEnvironment.ContentRootPath;
+            this.basePath = env.ContentRootPath;
             this.operation = new AmazonS3FileProvider();
+            /**
+             *  To overwrite appsettings by env variables uses such env variable name "S3:Name", "S3:AccessKey", "S3:SecretKey"
+             */
             var s3config = config.GetSection("S3");
             var bucket = s3config.GetSection("Name").Value;
             var accessKey = s3config.GetSection("AccessKey").Value;
@@ -88,7 +93,7 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         // uploads the file(s) into a specified path
         [Route("AmazonS3Upload")]
         [HttpPost]
-        public IActionResult AmazonS3Upload(string path, IList<IFormFile> uploadFiles, string action, string data)
+        public IActionResult AmazonS3Upload([FromQuery] string path, IList<IFormFile> uploadFiles, [FromQuery] string action, [FromQuery] string data)
         {
             FileManagerResponse uploadResponse;
             FileManagerDirectoryContent[] dataObject = new FileManagerDirectoryContent[1];
