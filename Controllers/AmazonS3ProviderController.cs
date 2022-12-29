@@ -93,36 +93,68 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         // uploads the file(s) into a specified path
         [Route("AmazonS3Upload")]
         [HttpPost]
-        public IActionResult AmazonS3Upload([FromQuery] string path, IList<IFormFile> uploadFiles, [FromQuery] string action, [FromQuery] string data)
+        public IActionResult AmazonS3Upload([FromForm, Required] string path, IList<IFormFile> uploadFiles, [FromForm, Required] string action, [FromForm, Required] string data)
         {
             FileManagerResponse uploadResponse;
-            FileManagerDirectoryContent[] dataObject = new FileManagerDirectoryContent[1];
-            dataObject[0] = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(data);
-            foreach (var file in uploadFiles)
+            
+            if(String.IsNullOrEmpty(path))
             {
-                var folders = (file.FileName).Split('/');
-                // checking the folder upload
-                if (folders.Length > 1)
+                Console.WriteLine("Error -> required parameter path is null or empty");
+                return BadRequest("Required parameter path is null or empty");
+            }
+
+            if (String.IsNullOrEmpty(action))
+            {
+                Console.WriteLine("Error -> required parameter action is null or empty");
+                return BadRequest("Required parameter action is null or empty");
+            }
+
+            if (String.IsNullOrEmpty(data))
+            {
+                Console.WriteLine("Error -> required parameter data is null or empty");
+                return BadRequest("Required parameter data is null or empty");
+            }
+
+            if(uploadFiles == null || uploadFiles.Count == 0)
+            {
+                Console.WriteLine("Error -> no upload files");
+                return BadRequest("No upload files");
+            }
+            try
+            {
+                FileManagerDirectoryContent[] dataObject = new FileManagerDirectoryContent[1];
+                dataObject[0] = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(data);
+                foreach (var file in uploadFiles)
                 {
-                    for (var i = 0; i < folders.Length - 1; i++)
+                    var folders = (file.FileName).Split('/');
+                    // checking the folder upload
+                    if (folders.Length > 1)
                     {
-                        if (!this.operation.checkFileExist(path, folders[i]))
+                        for (var i = 0; i < folders.Length - 1; i++)
                         {
-                            this.operation.ToCamelCase(this.operation.Create(path, folders[i], dataObject));
+                            if (!this.operation.checkFileExist(path, folders[i]))
+                            {
+                                this.operation.ToCamelCase(this.operation.Create(path, folders[i], dataObject));
+                            }
+                            path += folders[i] + "/";
                         }
-                        path += folders[i] + "/";
                     }
                 }
-            }
-            uploadResponse = operation.Upload(path, uploadFiles, action, dataObject);
-            if (uploadResponse.Error != null)
+                uploadResponse = operation.Upload(path, uploadFiles, action, dataObject);
+                if (uploadResponse.Error != null)
+                {
+                    Response.Clear();
+                    Response.ContentType = "application/json; charset=utf-8";
+                    Response.StatusCode = Convert.ToInt32(uploadResponse.Error.Code);
+                    Response.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = uploadResponse.Error.Message;
+                }
+                return Content("");
+            } 
+            catch(Exception e)
             {
-                Response.Clear();
-                Response.ContentType = "application/json; charset=utf-8";
-                Response.StatusCode = Convert.ToInt32(uploadResponse.Error.Code);
-                Response.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = uploadResponse.Error.Message;
+                Console.WriteLine("Error during S3 upload: " + e.Message);
+                return StatusCode(500, e.Message);
             }
-            return Content("");
         }
 
         // downloads the selected file(s) and folder(s)

@@ -1,4 +1,5 @@
 ﻿using System;
+using AWSS3FileProvider.Middleware;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -58,7 +59,7 @@ namespace EJ2FileManagerService
 
             app.UseCors("AllowAllOrigins");
             app.UseHttpsRedirection();
-            
+            app.UseRequestResponseLogging();
             app.UseMvc();
             app.UseSwagger();
             app.UseSwaggerUI(c => {
