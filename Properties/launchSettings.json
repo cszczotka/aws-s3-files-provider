@@ -11,19 +11,10 @@
     "IIS Express": {
       "commandName": "IISExpress",
       "launchBrowser": true,
-      "launchUrl": "api/healthcheck",
+      "launchUrl": "swagger",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
-    },
-    "EJ2FileManagerService": {
-      "commandName": "Project",
-      "launchBrowser": true,
-      "launchUrl": "api/healthcheck",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "applicationUrl": "http://localhost:62870/"
     }
   }
 }

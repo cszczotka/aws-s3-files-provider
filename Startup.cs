@@ -1,11 +1,19 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Text;
 using AWSS3FileProvider.Middleware;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Logging;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Newtonsoft.Json;
 using Swashbuckle.AspNetCore;
 
 namespace EJ2FileManagerService
@@ -15,6 +23,7 @@ namespace EJ2FileManagerService
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
+            IdentityModelEventSource.ShowPII = true;
         }
 
         public IConfiguration Configuration { get; }
@@ -22,16 +31,6 @@ namespace EJ2FileManagerService
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddSwaggerGen();
-            services.AddSwaggerGen(c =>
-            {
-                c.SwaggerDoc("v1", new OpenApiInfo
-                {
-                    Version = "v1",
-                    Title = "Amazon S3 File Provider API",
-                    Description = "Swagger UI for Amazon S3 File Provider API",
-                });
-            });
 
             services.AddMvc(option => option.EnableEndpointRouting = false);
             services.AddCors(options =>
@@ -43,6 +42,80 @@ namespace EJ2FileManagerService
                     .AllowAnyHeader();
                 });
             });
+
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultSignInScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+
+            }).AddJwtBearer(options => {
+                options.TokenValidationParameters = GetCognitoTokenValidationParams();
+
+            });
+
+            services.AddSwaggerGen();
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Version = "v1",
+                    Title = "Amazon S3 File Provider API",
+                    Description = "Swagger UI for Amazon S3 File Provider API",
+                });
+                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Type = SecuritySchemeType.Http,
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Scheme = "Bearer",
+                    Description = "Please insert JWT token into field"
+                });
+                c.AddSecurityRequirement(new OpenApiSecurityRequirement {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        new string[] { }
+                    }
+                });
+            });
+        }
+
+
+        private TokenValidationParameters GetCognitoTokenValidationParams()
+        {
+            var cognitoIssuer = $"https://cognito-idp.{Configuration["JwtToken:region"]}.amazonaws.com/{Configuration["JwtToken:userPoolId"]}";
+          
+
+            var jwtKeySetUrl = $"{cognitoIssuer}/.well-known/jwks.json";
+
+            var cognitoAudience = Configuration["JwtToken:appClientId"];
+
+            return new TokenValidationParameters
+            {
+                IssuerSigningKeyResolver = (s, securityToken, identifier, parameters) =>
+                {
+                    // get JsonWebKeySet from AWS 
+                    var json = new WebClient().DownloadString(jwtKeySetUrl);
+
+                    // serialize the result 
+                    var keys = JsonConvert.DeserializeObject<JsonWebKeySet>(json).Keys;
+
+                    // cast the result to be the type expected by IssuerSigningKeyResolver 
+                    return (IEnumerable<SecurityKey>)keys;
+                },
+                ValidIssuer = cognitoIssuer,
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = true,
+                ValidateLifetime = true,
+                ValidAudience = cognitoAudience
+            };
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -57,9 +130,17 @@ namespace EJ2FileManagerService
                 app.UseHsts();
             }         
 
-            app.UseCors("AllowAllOrigins");
+            app.UseCors(option => option
+               .AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader());
+
+            app.UseAuthentication();
+            //app.UseAuthorization();
+
             app.UseHttpsRedirection();
-            app.UseRequestResponseLogging();
+            app.UseAuthzMiddleware();
+            //app.UseRequestResponseLogging();
             app.UseMvc();
             app.UseSwagger();
             app.UseSwaggerUI(c => {

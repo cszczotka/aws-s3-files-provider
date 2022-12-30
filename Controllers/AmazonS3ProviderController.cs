@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Authorization;
 
 namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
 {
@@ -44,6 +45,7 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         
         [Route("AmazonS3FileOperations")]
         [HttpPost]
+        [Authorize]
         public object AmazonS3FileOperations([FromBody] FileManagerDirectoryContent args)
         {
             if (args.Action == "delete" || args.Action == "rename")
@@ -93,6 +95,7 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         // uploads the file(s) into a specified path
         [Route("AmazonS3Upload")]
         [HttpPost]
+        [Authorize]
         public IActionResult AmazonS3Upload([FromForm, Required] string path, IList<IFormFile> uploadFiles, [FromForm, Required] string action, [FromForm, Required] string data)
         {
             FileManagerResponse uploadResponse;
@@ -160,6 +163,7 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         // downloads the selected file(s) and folder(s)
         [Route("AmazonS3Download")]
         [HttpPost]
+        [Authorize]
         public IActionResult AmazonS3Download(string downloadInput)
         {
             FileManagerDirectoryContent args = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(downloadInput);
@@ -169,15 +173,10 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         // gets the image(s) from the given path
         [Route("AmazonS3GetImage")]
         [HttpGet]
+        [Authorize]
         public IActionResult AmazonS3GetImage(FileManagerDirectoryContent args)
         {
             return operation.GetImage(args.Path, args.Id, false, null, args.Data);
-        }
-
-        [HttpGet("{id}")]
-        public string Get(int id)
-        {
-            return "value";
         }
 
     }
